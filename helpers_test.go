@@ -1,0 +1,121 @@
+package main
+
+import (
+	"fmt"
+	"testing"
+
+	"github.com/stretchr/testify/assert"
+)
+
+func checkByteSliceEqual(a []byte, b []byte) bool {
+	if len(a) != len(b) {
+		return false
+	}
+
+	for i := range a {
+		if a[i] != b[i] {
+			return false
+		}
+	}
+	return true
+}
+
+func TestMixColumns(test *testing.T) {
+	assert.True(test, true)
+
+	before := []byte{
+		0x63, 0x53, 0xe0, 0x8c,
+		0x09, 0x60, 0xe1, 0x04,
+		0xcd, 0x70, 0xb7, 0x51,
+		0xba, 0xca, 0xd0, 0xe7,
+	}
+	after := []byte{
+		0x5f, 0x72, 0x64, 0x15,
+		0x57, 0xf5, 0xbc, 0x92,
+		0xf7, 0xbe, 0x3b, 0x29,
+		0x1d, 0xb9, 0xf9, 0x1a,
+	}
+
+	assert.True(test, checkByteSliceEqual(mixColumnsWrapper(before), after))
+}
+
+func TestKeySchedule(test *testing.T) {
+
+	shortKey := []byte{
+		0x2b, 0x7e, 0x15, 0x16,
+		0x28, 0xae, 0xd2, 0xa6,
+		0xab, 0xf7, 0x15, 0x88,
+		0x09, 0xcf, 0x4f, 0x3c}
+
+	shortKeyRd1 := []byte{
+		0xa0, 0xfa, 0xfe, 0x17,
+		0x88, 0x54, 0x2c, 0xb1,
+		0x23, 0xa3, 0x39, 0x39,
+		0x2a, 0x6c, 0x76, 0x05,
+	}
+	shortKeyRd2 := []byte{
+		0xf2, 0xc2, 0x95, 0xf2,
+		0x7a, 0x96, 0xb9, 0x43,
+		0x59, 0x35, 0x80, 0x7a,
+		0x73, 0x59, 0xf6, 0x7f,
+	}
+	shortKeyRd3 := []byte{
+		0x3d, 0x80, 0x47, 0x7d,
+		0x47, 0x16, 0xfe, 0x3e,
+		0x1e, 0x23, 0x7e, 0x44,
+		0x6d, 0x7a, 0x88, 0x3b,
+	}
+
+	assert.True(test, checkByteSliceEqual(shortKeyRd1, getNextKeySchedule(shortKey, 0)))
+	assert.True(test, checkByteSliceEqual(getNextKeySchedule(shortKeyRd1, 1), shortKeyRd2))
+	assert.True(test, checkByteSliceEqual(getNextKeySchedule(getNextKeySchedule(getNextKeySchedule(shortKey, 0), 1), 2), shortKeyRd3))
+}
+
+func TestShiftRows(test *testing.T) {
+	stateInit := []byte{
+		0xd4, 0x27, 0x11, 0xae,
+		0xe0, 0xbf, 0x98, 0xf1,
+		0xb8, 0xb4, 0x5d, 0xe5,
+		0x1e, 0x41, 0x52, 0x30,
+	}
+	stateAfter := []byte{
+		0xd4, 0xbf, 0x5d, 0x30,
+		0xe0, 0xb4, 0x52, 0xae,
+		0xb8, 0x41, 0x11, 0xf1,
+		0x1e, 0x27, 0x98, 0xe5,
+	}
+	a := shiftRows(stateInit)
+	assert.True(test, checkByteSliceEqual(a, stateAfter))
+	fmt.Printf("%x\n%x\n", a, stateAfter)
+}
+
+func TestGetSubsByte(test *testing.T) {
+	testBytes := [][]byte{
+		{0xcf, 0x8a},
+		{0x4f, 0x84},
+		{0x3c, 0xeb},
+		{0x09, 0x01}}
+
+	for _, cur := range testBytes {
+		assert.Equal(test, cur[1], getSubsByte(cur[0]))
+	}
+}
+
+func TestEncrypt(test *testing.T) {
+
+	values := getInOuts()
+
+	for _, curValue := range values {
+		val := encrypt(curValue.input, curValue.key)
+		assert.True(test, checkByteSliceEqual(val, curValue.output))
+	}
+}
+
+func TestDecrypt(test *testing.T) {
+	values := getInOuts()
+
+	for _, curValue := range values {
+		val := decrypt(curValue.output, curValue.key)
+		assert.True(test, checkByteSliceEqual(val, curValue.input))
+	}
+}
