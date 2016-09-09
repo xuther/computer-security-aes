@@ -106,7 +106,7 @@ func TestEncrypt(test *testing.T) {
 	values := getInOuts()
 
 	for _, curValue := range values {
-		val := encrypt(curValue.input, curValue.key)
+		val := encryptWPrint(curValue.input, curValue.key)
 		assert.True(test, checkByteSliceEqual(val, curValue.output))
 	}
 }
