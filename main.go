@@ -154,6 +154,67 @@ func encryptWPrint(input []byte, key []byte) []byte {
 	return input
 }
 
+func inverseShiftRows(input []byte) []byte {
+	//three rows
+	for i := 1; i < 4; i++ {
+		//four values to move
+		shiftRow := i % 4
+		for j := 0; j < i; j++ {
+			temp := input[shiftRow+(4*3)]
+			for k := 2; k >= 0; k-- {
+				input[shiftRow+(4*(k+1))] = input[shiftRow+(4*k)]
+			}
+
+			input[shiftRow] = temp
+			//Print new matrix
+		}
+
+		//fmt.Printf("%x,%x,%x,%x\n", input[shiftRow], input[shiftRow+4], input[shiftRow+8], input[shiftRow+12])
+	}
+	return input
+}
+
+func inverseSubBytes(input []byte) []byte {
+	for i := range input {
+		input[i] = getInvSubsByte(input[i])
+	}
+	return input
+}
+
+func inverseMixColsWrapper(input []byte) []byte {
+	stateForMixCol := [4][4]byte{}
+	for i := 0; i < len(input); i++ {
+		stateForMixCol[i%4][i/4] = input[i]
+	}
+
+	cols := inverseMixCols(stateForMixCol)
+	for i := 0; i < len(input); i++ {
+		input[i] = cols[i%4][i/4]
+	}
+	return input
+}
+
+func inverseMixCols(state [4][4]byte) [4][4]byte {
+	MultMatrix := [4][4]byte{
+		{0x0e, 0x0b, 0x0d, 0x09},
+		{0x09, 0x0e, 0x0b, 0x0d},
+		{0x0d, 0x09, 0x0e, 0x0b},
+		{0x0b, 0x0d, 0x09, 0x0e}}
+	toReturn := [4][4]byte{}
+
+	//Run through each column in state
+	for i := 0; i < 4; i++ {
+		curCol := i
+		//Matrix Mult
+		for j := 0; j < 4; j++ {
+			for k := 0; k < 4; k++ {
+				toReturn[j][curCol] = toReturn[j][curCol] ^ mult(state[k][curCol], MultMatrix[j][k])
+			}
+		}
+	}
+	return toReturn
+}
+
 func encrypt(input []byte, key []byte) []byte {
 
 	keySchedule := getKeySchedule(key)
@@ -177,31 +238,82 @@ func encrypt(input []byte, key []byte) []byte {
 	return input
 }
 
-func decrypt(input []byte, key []byte) []byte {
-	return []byte{}
+func decryptEquivWPrint(input []byte, key []byte) []byte {
+	keySchedule := getKeySchedule(key)
+	nr := getNRFromKeyLen(key)
+
+	//init add round key
+	fmt.Printf("start[0]\n%x\n", input)
+	key = keySchedule[nr*16 : (nr+1)*16]
+	fmt.Printf("rawKey\n%x\n", key)
+	//key = inverseMixColsWrapper(key)
+
+	input = addKey(key, input)
+	fmt.Printf("k_sch[0]\n%x\n", key)
+
+	//begin the run.
+	for i := 1; i < nr; i++ {
+		fmt.Printf("start[%v]\n%x\n", i, input)
+		input = inverseSubBytes(input)
+		fmt.Printf("s_box[%v]\n%x\n", i, input)
+		input = inverseShiftRows(input)
+		fmt.Printf("s_row[%v]\n%x\n", i, input)
+		input = inverseMixColsWrapper(input)
+		fmt.Printf("m_col[%v]\n%x\n", i, input)
+		key = keySchedule[(nr-i)*16 : ((nr-i)+1)*16]
+		key = inverseMixColsWrapper(key)
+		input = addKey(key, input)
+		fmt.Printf("k_sch[%v]\n%x\n", i, key)
+	}
+	fmt.Printf("start[%v]\n%x\n", nr, input)
+	input = inverseSubBytes(input)
+	fmt.Printf("s_box[%v]\n%x\n", nr, input)
+	input = inverseShiftRows(input)
+	fmt.Printf("s_row[%v]\n%x\n", nr, input)
+	key = keySchedule[:16]
+	//key = inverseMixColsWrapper(key)
+	input = addKey(key, input)
+	fmt.Printf("k_sch[%v]\n%x\n", nr, keySchedule[:16])
+
+	fmt.Printf("output[%v]\n%x\n", nr, input)
+
+	return input
+}
+
+func decryptWPrint(input []byte, key []byte) []byte {
+	keySchedule := getKeySchedule(key)
+	nr := getNRFromKeyLen(key)
+
+	//init add round key
+	fmt.Printf("start[0]\n%x\n", input)
+	input = addKey(keySchedule[nr*16:(nr+1)*16], input)
+	fmt.Printf("k_sch[0]\n%x\n", keySchedule[nr*16:(nr+1)*16])
+
+	//begin the run.
+	for i := 1; i < nr; i++ {
+		fmt.Printf("start[%v]\n%x\n", i, input)
+		input = inverseShiftRows(input)
+		fmt.Printf("s_row[%v]\n%x\n", i, input)
+		input = inverseSubBytes(input)
+		fmt.Printf("s_box[%v]\n%x\n", i, input)
+		input = addKey(keySchedule[(nr-i)*16:((nr-i)+1)*16], input)
+		fmt.Printf("k_sch[%v]\n%x\n", i, keySchedule[(nr-i)*16:((nr-i)+1)*16])
+		fmt.Printf("k_add[%v]\n%x\n", i, input)
+		input = inverseMixColsWrapper(input)
+	}
+	fmt.Printf("start[%v]\n%x\n", nr, input)
+	input = inverseShiftRows(input)
+	fmt.Printf("s_row[%v]\n%x\n", nr, input)
+	input = inverseSubBytes(input)
+	fmt.Printf("s_box[%v]\n%x\n", nr, input)
+	input = addKey(keySchedule[:16], input)
+	fmt.Printf("k_sch[%v]\n%x\n", nr, keySchedule[:16])
+
+	fmt.Printf("output[%v]\n%x\n", nr, input)
+
+	return input
 }
 
 func main() {
-	input := []byte{
-		0x00, 0x11, 0x22, 0x33,
-		0x44, 0x55, 0x66, 0x77,
-		0x88, 0x99, 0xaa, 0xbb,
-		0xcc, 0xdd, 0xee, 0xff}
-	key := []byte{
-		0x00, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07,
-		0x08, 0x09, 0x0a, 0x0b, 0x0c, 0x0d, 0x0e, 0x0f,
-		0x10, 0x11, 0x12, 0x13, 0x14, 0x15, 0x16, 0x17,
-		0x18, 0x19, 0x1a, 0x1b, 0x1c, 0x1d, 0x1e, 0x1f}
-	// key := []byte{
-	// 	0x60, 0x3d, 0xeb, 0x10, 0x15, 0xca, 0x71, 0xbe,
-	// 	0x2b, 0x73, 0xae, 0xf0, 0x85, 0x7d, 0x77, 0x81,
-	// 	0x1f, 0x35, 0x2c, 0x07, 0x3b, 0x61, 0x08, 0xd7,
-	// 	0x2d, 0x98, 0x10, 0xa3, 0x09, 0x14, 0xdf, 0xf4}
-	output := []byte{
-		0x8e, 0xa2, 0xb7, 0xca,
-		0x51, 0x67, 0x45, 0xbf,
-		0xea, 0xfc, 0x49, 0x90,
-		0x4b, 0x49, 0x60, 0x89}
 
-	fmt.Printf("%x\n%x", encryptWPrint(input, key), output)
 }

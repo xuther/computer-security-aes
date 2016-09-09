@@ -89,6 +89,23 @@ func TestShiftRows(test *testing.T) {
 	fmt.Printf("%x\n%x\n", a, stateAfter)
 }
 
+func TestInverseShifRows(test *testing.T) {
+	stateInit := []byte{
+		0xd4, 0x27, 0x11, 0xae,
+		0xe0, 0xbf, 0x98, 0xf1,
+		0xb8, 0xb4, 0x5d, 0xe5,
+		0x1e, 0x41, 0x52, 0x30,
+	}
+	stateAfter := []byte{
+		0xd4, 0x41, 0x5d, 0xf1,
+		0xe0, 0x27, 0x52, 0xe5,
+		0xb8, 0xbf, 0x11, 0x30,
+		0x1e, 0xb4, 0x98, 0xae,
+	}
+	a := inverseShiftRows(stateInit)
+	assert.True(test, checkByteSliceEqual(a, stateAfter))
+}
+
 func TestGetSubsByte(test *testing.T) {
 	testBytes := [][]byte{
 		{0xcf, 0x8a},
@@ -101,21 +118,82 @@ func TestGetSubsByte(test *testing.T) {
 	}
 }
 
-func TestEncrypt(test *testing.T) {
+func TestGetInvSubsByte(test *testing.T) {
+	testBytes := [][]byte{
+		{0xcf, 0x8a},
+		{0x4f, 0x84},
+		{0x3c, 0xeb},
+		{0x09, 0x01}}
 
+	for _, cur := range testBytes {
+		assert.Equal(test, cur[0], getInvSubsByte(cur[1]))
+	}
+}
+
+func TestInvMixColumns(test *testing.T) {
+	assert.True(test, true)
+
+	input := []byte{
+		0xbd, 0x6e, 0x7c, 0x3d,
+		0xf2, 0xb5, 0x77, 0x9e,
+		0x0b, 0x61, 0x21, 0x6e,
+		0x8b, 0x10, 0xb6, 0x89,
+	}
+	output := []byte{
+		0x47, 0x73, 0xb9, 0x1f,
+		0xf7, 0x2f, 0x35, 0x43,
+		0x61, 0xcb, 0x01, 0x8e,
+		0xa1, 0xe6, 0xcf, 0x2c,
+	}
+
+	assert.True(test, checkByteSliceEqual(inverseMixColsWrapper(input), output))
+
+	input2 := []byte{
+		0xe9, 0xf7, 0x4e, 0xec,
+		0x02, 0x30, 0x20, 0xf6,
+		0x1b, 0xf2, 0xcc, 0xf2,
+		0x35, 0x3c, 0x21, 0xc7,
+	}
+
+	output2 := []byte{
+		0x54, 0xd9, 0x90, 0xa1,
+		0x6b, 0xa0, 0x9a, 0xb5,
+		0x96, 0xbb, 0xf4, 0x0e,
+		0xa1, 0x11, 0x70, 0x2f,
+	}
+
+	assert.True(test, checkByteSliceEqual(inverseMixColsWrapper(input2), output2))
+}
+
+func TestEncrypt(test *testing.T) {
+	fmt.Printf("\n\n\n-----------------------TEST ENCRYPT----------------------\n")
 	values := getInOuts()
 
 	for _, curValue := range values {
 		val := encryptWPrint(curValue.input, curValue.key)
 		assert.True(test, checkByteSliceEqual(val, curValue.output))
 	}
+	fmt.Printf("\n\n\n")
 }
 
 func TestDecrypt(test *testing.T) {
+	fmt.Printf("\n\n\n-----------------------TEST DECRYPT----------------------\n")
 	values := getInOuts()
 
 	for _, curValue := range values {
-		val := decrypt(curValue.output, curValue.key)
+		val := decryptWPrint(curValue.output, curValue.key)
 		assert.True(test, checkByteSliceEqual(val, curValue.input))
 	}
+	fmt.Printf("\n\n\n")
+}
+
+func TestDecryptEquivWPrint(test *testing.T) {
+	fmt.Printf("\n\n\n-----------------------TEST EQUIV DECRYPT----------------------\n")
+	values := getInOuts()
+
+	for _, curValue := range values {
+		val := decryptEquivWPrint(curValue.output, curValue.key)
+		assert.True(test, checkByteSliceEqual(val, curValue.input))
+	}
+	fmt.Printf("\n\n\n")
 }
